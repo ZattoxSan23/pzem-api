@@ -1,0 +1,12 @@
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+pydantic
+fastapi
+uvicorn
+torch
+torchaudio
+torchvision
+python-dotenv
