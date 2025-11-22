@@ -1,10 +1,20 @@
 # src/api.py
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware  # Agregar esta importación
 from pydantic import BaseModel
 from src.models.detectors import MultiAnomalyDetector
 from src.predictors import Forecaster
 
 app = FastAPI(title="Energy AI - PZEM + Historic")
+
+# Configurar CORS - AGREGAR ESTO
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # En producción, especifica los dominios permitidos
+    allow_credentials=True,
+    allow_methods=["*"],  # Permite todos los métodos incluyendo OPTIONS
+    allow_headers=["*"],
+)
 
 detector = MultiAnomalyDetector()
 forecaster_power = Forecaster(which="power")
@@ -45,7 +55,6 @@ def detect(payload: PZEMPayload):
 @app.post("/detect_cut")
 def detect_cut(payload: PZEMPayload):
     return detector.detect_cut(payload.dict())
-
 
 
 # -------------------------
