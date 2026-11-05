@@ -4,7 +4,7 @@ from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 from src.feature_engineering import FeatureEngineer
 
-MODELS_DIR = "models"
+MODELS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models"))
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class AE(nn.Module):

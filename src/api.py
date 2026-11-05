@@ -7,6 +7,7 @@ import numpy as np
 
 from src.models.detectors import MultiAnomalyDetector
 from src.predictors import Forecaster
+from src.history import normalize_history, forecast_history
 
 app = FastAPI(title="Energy AI - PZEM + Historic")
 
@@ -109,11 +110,7 @@ async def detect_leak(data: HistoryList):
         if not history or len(history) == 0:
             return {"leak": False, "reason": "No data provided"}
         
-        # Convertir a lista de números
-        if isinstance(history[0], dict):
-            power_values = [float(h.get("power", h.get("P", 0))) for h in history]
-        else:
-            power_values = [float(x) for x in history]
+        power_values = normalize_history(history, "power")
             
         # Lógica simple de detección de fugas
         if len(power_values) < 5:
@@ -131,58 +128,31 @@ async def detect_leak(data: HistoryList):
         else:
             return {"leak": False, "reason": "No energy leak detected"}
             
-    except Exception as e:
-        raise HTTPException(500, f"Leak detection error: {str(e)}")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Leak detection failed") from exc
+
+def predict_response(data, forecaster, metric, response_key):
+    try:
+        prediction, metadata = forecast_history(data.history, forecaster, metric)
+        return {response_key: prediction, **metadata}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        # Do not disguise a failed model as a successful AI prediction.
+        raise HTTPException(status_code=503, detail="Prediction model unavailable") from exc
+
 
 @app.post("/predict_energy")
-async def predict_energy(data: HistoryList):
-    """Predicción de consumo de energía"""
-    try:
-        if forecaster_energy.model is None:
-            # Predicción simple si el modelo no está cargado
-            if data.history:
-                last_value = float(data.history[-1]) if data.history else 0
-                return {"next_energy": last_value * 1.02}  # Incremento del 2%
-            return {"next_energy": 0.0}
-            
-        history = [float(x) for x in data.history]
-        if len(history) < 10:
-            return {"next_energy": history[-1] if history else 0.0}
-            
-        prediction = forecaster_energy.predict_next(history)
-        return {"next_energy": prediction}
-        
-    except Exception as e:
-        # Fallback a predicción simple
-        if data.history:
-            last_value = float(data.history[-1]) if data.history else 0
-            return {"next_energy": last_value}
-        return {"next_energy": 0.0}
+def predict_energy(data: HistoryList):
+    return predict_response(data, forecaster_energy, "energy", "next_energy")
+
 
 @app.post("/predict_power")
-async def predict_power(data: HistoryList):
-    """Predicción de potencia"""
-    try:
-        if forecaster_power.model is None:
-            # Predicción simple si el modelo no está cargado
-            if data.history:
-                last_value = float(data.history[-1]) if data.history else 0
-                return {"next_power_w": last_value}
-            return {"next_power_w": 0.0}
-            
-        history = [float(x) for x in data.history]
-        if len(history) < 10:
-            return {"next_power_w": history[-1] if history else 0.0}
-            
-        prediction = forecaster_power.predict_next(history)
-        return {"next_power_w": prediction}
-        
-    except Exception as e:
-        # Fallback
-        if data.history:
-            last_value = float(data.history[-1]) if data.history else 0
-            return {"next_power_w": last_value}
-        return {"next_power_w": 0.0}
+def predict_power(data: HistoryList):
+    return predict_response(data, forecaster_power, "power", "next_power_w")
+
 
 @app.post("/advice")
 async def get_energy_advice(payload: PZEMPayload):
