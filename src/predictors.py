@@ -1,6 +1,6 @@
 # src/predictors.py
 import os, joblib, numpy as np, torch, torch.nn as nn
-MODELS_DIR = "models"
+MODELS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "models"))
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class LSTMForecast(nn.Module):
